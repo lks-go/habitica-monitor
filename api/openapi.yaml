@@ -1,0 +1,68 @@
+openapi: 3.0.3
+info:
+  title: Habitica Monitor API
+  version: v1
+  description: Внутренний API сервиса мониторинга команды в Habitica.
+servers:
+  - url: /api/v1
+paths:
+  /user:
+    post:
+      operationId: createUser
+      summary: Добавить пользователя в таблицу user
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [id, api_key, name]
+              properties:
+                id:      { type: string, description: "Habitica x-api-user" }
+                api_key: { type: string, description: "Habitica x-api-key (секрет)" }
+                name:    { type: string, description: "Имя, задаётся вручную" }
+            example: { id: "abc-123", api_key: "secret-token", name: "alice" }
+      responses:
+        '201':
+          description: Пользователь создан.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:   { type: string }
+                  name: { type: string }
+        '400': { description: Ошибка валидации. }
+
+  /user/stats/history:
+    get:
+      operationId: getStatsHistory
+      summary: История статов пользователя из таблицы stats_history
+      parameters:
+        - name: user_id
+          in: query
+          required: true
+          schema: { type: string }
+        - name: limit
+          in: query
+          required: false
+          schema: { type: integer, minimum: 0 }
+          description: "Сколько последних записей вернуть (0 — все)."
+      responses:
+        '200':
+          description: Массив снапшотов, новые первыми.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    user_id:   { type: string }
+                    hp:        { type: number }
+                    mp:        { type: number }
+                    exp:       { type: number }
+                    gp:        { type: number }
+                    lvl:       { type: integer }
+                    timestamp: { type: string, format: date-time }
+        '400': { description: user_id обязателен. }

@@ -24,6 +24,11 @@ export function createUser({ id, api_key, name }) {
   });
 }
 
+// GET /api/v1/users — список пользователей со всеми данными (профиль + последний снапшот).
+export function getUsers() {
+  return request("/api/v1/users");
+}
+
 // GET /api/v1/user/stats/history — история статов.
 export function getStatsHistory(userId, limit) {
   const params = new URLSearchParams({ user_id: userId });

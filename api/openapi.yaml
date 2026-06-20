@@ -34,6 +34,35 @@ paths:
                   name: { type: string }
         '400': { description: Ошибка валидации. }
 
+  /users:
+    get:
+      operationId: listUsers
+      summary: Список пользователей со всеми данными (профиль + последний снапшот)
+      responses:
+        '200':
+          description: Массив пользователей.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id:   { type: string, description: "Habitica x-api-user" }
+                    name: { type: string }
+                    latest_stats:
+                      nullable: true
+                      description: "Последний снапшот статов (null, если их ещё нет)."
+                      type: object
+                      properties:
+                        user_id:   { type: string }
+                        hp:        { type: number }
+                        mp:        { type: number }
+                        exp:       { type: number }
+                        gp:        { type: number }
+                        lvl:       { type: integer }
+                        timestamp: { type: string, format: date-time }
+
   /user/stats/history:
     get:
       operationId: getStatsHistory

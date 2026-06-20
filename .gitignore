@@ -1,6 +1,8 @@
 # Go
 /monitor
 *.db
+*.db-wal
+*.db-shm
 
 # Node / web
 web/node_modules/

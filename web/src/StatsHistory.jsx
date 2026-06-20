@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import {
   LineChart,
   Line,
@@ -9,7 +9,7 @@ import {
   Legend,
   ResponsiveContainer,
 } from "recharts";
-import { getStatsHistory } from "./api";
+import { getStatsHistory, getUsers } from "./api";
 
 const fmt = (ts) =>
   new Date(ts).toLocaleString("ru-RU", {
@@ -20,7 +20,10 @@ const fmt = (ts) =>
   });
 
 // Экран истории статов -> GET /api/v1/user/stats/history.
-export default function StatsHistory() {
+// Выбор пользователя — выпадающий список из GET /api/v1/users.
+export default function StatsHistory({ usersVersion = 0 }) {
+  const [users, setUsers] = useState([]);
+  const [usersError, setUsersError] = useState(null);
   const [userId, setUserId] = useState("");
   const [limit, setLimit] = useState("50");
   const [rows, setRows] = useState([]);
@@ -28,21 +31,53 @@ export default function StatsHistory() {
   const [loading, setLoading] = useState(false);
   const [loaded, setLoaded] = useState(false);
 
-  async function load(e) {
-    e && e.preventDefault();
-    setLoading(true);
-    setError(null);
-    try {
-      const data = await getStatsHistory(userId, Number(limit) || 0);
-      setRows(data || []);
-      setLoaded(true);
-    } catch (err) {
-      setError(err.message);
+  // Загружаем список пользователей при монтировании и после добавления нового (usersVersion).
+  useEffect(() => {
+    let cancelled = false;
+    getUsers()
+      .then((data) => {
+        if (!cancelled) {
+          setUsers(data || []);
+          setUsersError(null);
+        }
+      })
+      .catch((err) => {
+        if (!cancelled) setUsersError(err.message);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [usersVersion]);
+
+  const load = useCallback(
+    async (uid, lim) => {
+      if (!uid) return;
+      setLoading(true);
+      setError(null);
+      try {
+        const data = await getStatsHistory(uid, Number(lim) || 0);
+        setRows(data || []);
+        setLoaded(true);
+      } catch (err) {
+        setError(err.message);
+        setRows([]);
+      } finally {
+        setLoading(false);
+      }
+    },
+    []
+  );
+
+  // Автоподгрузка истории при выборе пользователя (и при смене лимита).
+  useEffect(() => {
+    if (userId) {
+      load(userId, limit);
+    } else {
       setRows([]);
-    } finally {
-      setLoading(false);
+      setLoaded(false);
+      setError(null);
     }
-  }
+  }, [userId, limit, load]);
 
   // Для графика — в хронологическом порядке (API отдаёт новые первыми).
   const chartData = [...rows].reverse().map((r) => ({
@@ -56,14 +91,26 @@ export default function StatsHistory() {
   return (
     <section className="card">
       <h2>История статов</h2>
-      <form onSubmit={load} className="row">
-        <input
-          data-testid="input-userid"
+
+      {usersError && (
+        <p data-testid="status-users-error" className="msg err">
+          Не удалось загрузить список пользователей: {usersError}
+        </p>
+      )}
+
+      <div className="row">
+        <select
+          data-testid="select-userid"
           value={userId}
           onChange={(e) => setUserId(e.target.value)}
-          placeholder="User ID"
-          required
-        />
+        >
+          <option value="">— выберите пользователя —</option>
+          {users.map((u) => (
+            <option key={u.id} value={u.id}>
+              {u.name} ({u.id})
+            </option>
+          ))}
+        </select>
         <input
           data-testid="input-limit"
           type="number"
@@ -73,10 +120,21 @@ export default function StatsHistory() {
           placeholder="лимит"
           style={{ maxWidth: 110 }}
         />
-        <button data-testid="button-load" type="submit" disabled={loading}>
-          {loading ? "Загрузка…" : "Показать"}
+        <button
+          data-testid="button-reload"
+          type="button"
+          onClick={() => load(userId, limit)}
+          disabled={loading || !userId}
+        >
+          {loading ? "Загрузка…" : "Обновить"}
         </button>
-      </form>
+      </div>
+
+      {users.length === 0 && !usersError && (
+        <p data-testid="no-users" className="hint">
+          Пока нет пользователей. Добавьте пользователя в форме слева.
+        </p>
+      )}
 
       {error && (
         <p data-testid="status-error" className="msg err">

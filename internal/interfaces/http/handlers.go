@@ -27,6 +27,7 @@ func NewHandler(users *application.UserService, stats *application.StatsService)
 func (h *Handler) Routes() *http.ServeMux {
 	mux := http.NewServeMux()
 	mux.HandleFunc("POST /api/v1/user", h.createUser)
+	mux.HandleFunc("GET /api/v1/users", h.listUsers)
 	mux.HandleFunc("GET /api/v1/user/stats/history", h.statsHistory)
 	return mux
 }
@@ -42,6 +43,14 @@ type createUserRequest struct {
 type userResponse struct {
 	ID   string `json:"id"`
 	Name string `json:"name"`
+}
+
+// userWithStatsResponse — пользователь со всеми данными для GET /api/v1/users.
+// latest_stats == null, если снапшотов ещё нет.
+type userWithStatsResponse struct {
+	ID          string            `json:"id"`
+	Name        string            `json:"name"`
+	LatestStats *snapshotResponse `json:"latest_stats"`
 }
 
 type snapshotResponse struct {
@@ -75,6 +84,29 @@ func (h *Handler) createUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusCreated, userResponse{ID: u.ID, Name: u.Name})
+}
+
+// GET /api/v1/users — список пользователей со всеми данными (профиль + последний снапшот).
+func (h *Handler) listUsers(w http.ResponseWriter, r *http.Request) {
+	items, err := h.users.ListUsers(r.Context())
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to list users")
+		return
+	}
+
+	out := make([]userWithStatsResponse, 0, len(items))
+	for _, it := range items {
+		resp := userWithStatsResponse{ID: it.User.ID, Name: it.User.Name}
+		if it.LatestStats != nil {
+			s := it.LatestStats
+			resp.LatestStats = &snapshotResponse{
+				UserID: s.UserID, HP: s.HP, MP: s.MP, Exp: s.Exp,
+				GP: s.GP, Lvl: s.Lvl, Timestamp: s.Timestamp,
+			}
+		}
+		out = append(out, resp)
+	}
+	writeJSON(w, http.StatusOK, out)
 }
 
 // GET /api/v1/user/stats/history?user_id=...&limit=...

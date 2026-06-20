@@ -35,7 +35,7 @@ func main() {
 	habiticaClient := habitica.NewClient(cfg.XClient)
 
 	// --- Application ---
-	userSvc := application.NewUserService(userRepo)
+	userSvc := application.NewUserService(userRepo, statsRepo)
 	statsSvc := application.NewStatsService(statsRepo)
 	snapshotSvc := application.NewSnapshotService(userRepo, statsRepo, habiticaClient, cfg.SnapshotInterval)
 
